@@ -1,0 +1,132 @@
+---
+title: "Machine_Learning_Project"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+
+## Analysis
+
+Loading libraries.
+```{r}
+
+# install.packages("randomForest")
+# install.packages("caret")
+# install.packages("corrplot")
+# install.packages("rpart")
+# install.packages('e1071', dependencies=TRUE)
+
+library(kernlab)
+library(corrplot)
+library(caret)
+library(randomForest)
+```
+
+Loading data.
+```{r}
+url1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+url2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+destfile1 <- "./ML_proj/pml-training.csv"
+destfile2 <- "./ML_proj/pml-testing.csv"
+
+if (!file.exists("ML_proj")) {dir.create("ML_proj")}
+download.file(url1 , destfile = destfile1)
+download.file(url2 , destfile = destfile2)
+```
+
+Read data
+```{r}
+train <- read.csv("./ML_proj/pml-training.csv", na.strings = c("NA", " ", ""))
+test <- read.csv("./ML_proj/pml-testing.csv",na.strings = c("NA", " ", "") )
+```
+The dataset contains lot of missing values.
+
+The following code is to clean the data from missing values columns.
+```{r}
+# keep columns with no NAs:
+train_NA_ct <- apply(train, 2, function(x){sum(is.na(x))})
+train_clean <- train[, which(train_NA_ct==0)]
+
+test_NA_ct <- apply(test, 2, function(x){sum(is.na(x))})
+test_clean <- test[, which(test_NA_ct==0)]
+```
+
+Remove columns that do not contribute to the experiment
+```{r}
+train_regex <- grepl("user_name|timestamp|window|^X", names(train_clean))
+train_clean1 <- train_clean[, !train_regex]
+
+test_regex <- grepl("user_name|timestamp|window|^X", names(test_clean))
+test_clean1 <- test_clean[, !test_regex]
+
+dim(train_clean1)
+dim(test_clean1)
+```
+
+## Model development
+
+Partitioning the data into a 70:30 training and cross-validation datasets, to check for model over-fitting.
+```{r}
+set.seed(23456)
+inTrain <- createDataPartition(train_clean1$classe, p=0.70, list = FALSE)
+traing <- train_clean1[inTrain, ]
+val <- train_clean1[-inTrain, ]
+dim(traing)[1]
+dim(val)[1]
+```
+
+Fit the model with a Random Forest algorithm
+```{r, cache = T}
+model <- randomForest(classe ~ ., data = traing)
+model
+```
+
+The OOB estimate of error rate is 0.52%. 
+
+Performance analysis
+```{r, cache = T}
+predictVal <- predict(model, val)
+confusionMatrix(val$classe, predictVal)
+```
+
+The model accuracy is 99.71%, which is quiet robust.
+
+Apply the random Forest model to the test data.
+```{r, cache = T}
+predictTest <- predict(model, test_clean1)
+predictTest
+```
+
+## Conclusion
+A random forest model would accurately predict the mannerin which a person did the exercise.
+
+## Appendix
+
+Correlation matrix of the variables in the training dataset:
+```{r, cache=T}
+corr<- cor(traing[ , -length(names(traing))])
+corrplot(corr, method = "color")
+```
+
+
